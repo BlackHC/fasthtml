@@ -7,26 +7,30 @@ from .core import Client
 __all__ = ['fast_report']
 
 
-def fast_report(func, dest='report.html', route='/', **app_kwargs):
-    """Render `func` using FastHTML and save to `dest`.
+def fast_report(content, dest='report.html', **app_kwargs):
+    """Render `content` as a static HTML report and save to ``dest``.
 
-    `func` should be a callable that behaves like a FastHTML route handler,
-    returning FT elements or anything supported by FastHTML. Parameters in
-    `app_kwargs` are forwarded to :func:`fast_app` so you can enable features
-    such as KaTeX or additional headers. The rendered HTML page is written to
-    `dest` and the path to the generated file is returned.
+    ``content`` may be either a callable (a typical FastHTML handler) or an
+    object that FastHTML can render. It will be served at the root ``/`` route
+    of a temporary app which is then invoked via the in-memory :class:`Client`.
+    Parameters in ``app_kwargs`` are forwarded to :func:`fast_app` so additional
+    options such as KaTeX can be enabled. The generated HTML file path is
+    returned.
     """
-    # Build a temporary FastHTML app
-    app, rt = fast_app(**app_kwargs)[:2]
 
-    # Register the handler on the provided route
-    rt(route)(func)
+    app, rt = fast_app(**app_kwargs)
 
-    # Call the route using the in-memory client
+    if callable(content):
+        handler = content
+    else:
+        def handler(*args, **kwargs):
+            return content
+
+    rt('/')(handler)
+
     cli = Client(app)
-    html = cli.get(route).text
+    html = cli.get('/').text
 
-    # Write output HTML
     dest = Path(dest)
     dest.write_text(html, encoding='utf-8')
     return dest
